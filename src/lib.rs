@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use anyhow::{Result, anyhow};
-use serde::{Deserialize, Serialize, de};
+use serde::{Deserialize, Serialize};
 use serde_json::to_vec;
 use tiny_keccak::{Hasher, Keccak};
 
@@ -81,10 +81,30 @@ pub fn apply_block(prev: &WalletState, delta: &BlockDelta) -> Result<WalletState
     })
 }
 
-pub fn verify_transaction(prev: &WalletState, next: &WalletState, delta: &BlockDelta) -> bool {
-    unimplemented!()
+pub fn verify_transition(prev: &WalletState, next: &WalletState, delta: &BlockDelta) -> bool {
+    if delta.height != prev.anchor_height + 1 && delta.height != next.anchor_height {
+        return false;
+    }
+
+    let exp_proof = compute_next_proof(&prev.proof, delta, &next.notes);
+
+    if exp_proof != next.proof {
+        return false;
+    }
+
+    true
 }
 
 pub fn verify_chain(states: &[WalletState], deltas: &[BlockDelta]) -> bool {
-    unimplemented!()
+    if states.len() != deltas.len() + 1 {
+        return false;
+    }
+
+    for i in 0..deltas.len() {
+        if !verify_transition(&states[i], &states[i + 1], &deltas[i]) {
+            return false;
+        }
+    }
+
+    true
 }
