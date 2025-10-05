@@ -1,9 +1,9 @@
-use core::hash;
+use std::collections::HashSet;
 
-use anyhow::Result;
-use serde::{Deserialize, Serialize};
-use tiny_keccak::{Hasher, Keccak};
+use anyhow::{Result, anyhow};
+use serde::{Deserialize, Serialize, de};
 use serde_json::to_vec;
+use tiny_keccak::{Hasher, Keccak};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Note {
@@ -45,18 +45,40 @@ pub fn wallet_commitment(notes: &[Note]) -> String {
 }
 
 // hashing as a standin for proofs
-pub fn compute_next_proof(prev_proof: &str, height: u64, delta: &BlockDelta, next_notes: &[Note]) -> String {
-	let mut concat: Vec<u8> = Vec::new();
-	concat.extend_from_slice(prev_proof.as_bytes());
-	concat.extend_from_slice(&height.to_be_bytes());
-	concat.extend_from_slice(&to_vec(&delta).unwrap());
-	concat.extend_from_slice(wallet_commitment(next_notes).as_bytes());
+pub fn compute_next_proof(prev_proof: &str, delta: &BlockDelta, next_notes: &[Note]) -> String {
+    let mut concat: Vec<u8> = Vec::new();
+    concat.extend_from_slice(prev_proof.as_bytes());
+    concat.extend_from_slice(&to_vec(&delta).unwrap());
+    concat.extend_from_slice(wallet_commitment(next_notes).as_bytes());
 
-	hash_bytes(&concat)
+    hash_bytes(&concat)
 }
 
 pub fn apply_block(prev: &WalletState, delta: &BlockDelta) -> Result<WalletState> {
-    unimplemented!()
+    if delta.height != prev.anchor_height + 1 {
+        return Err(anyhow!(
+            "non-sequential height: got {}, expected {}",
+            delta.height,
+            prev.anchor_height + 1
+        ));
+    }
+
+    let spent: HashSet<&str> = delta.nullifiers.iter().map(|s| s.as_str()).collect();
+    let mut unspent_notes: Vec<Note> = prev
+        .notes
+        .iter()
+        .filter(|note| !spent.contains(note.commitment.as_str()))
+        .cloned()
+        .collect();
+    unspent_notes.extend(delta.new_notes.clone());
+
+    let next_proof = compute_next_proof(&prev.proof, delta, &unspent_notes);
+
+    Ok(WalletState {
+        anchor_height: delta.height,
+        notes: unspent_notes,
+        proof: next_proof,
+    })
 }
 
 pub fn verify_transaction(prev: &WalletState, next: &WalletState, delta: &BlockDelta) -> bool {
