@@ -45,3 +45,15 @@ fn test_commitment_stable() {
     ]);
     assert_eq!(c1, c2);
 }
+
+#[test]
+fn test_next_proof_changes_with_notes() {
+    let prev = "00";
+    let d = BlockDelta { height: 1, new_notes: vec![], nullifiers: vec![] };
+    let n1 = vec![Note{ commitment: "x".into()}];
+    let n2 = vec![Note{ commitment: "y".into()}];
+    assert_ne!(
+        compute_next_proof(prev, 1, &d, &n1),
+        compute_next_proof(prev, 1, &d, &n2)
+    );
+}
