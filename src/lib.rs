@@ -3,22 +3,22 @@ use serde::{Deserialize, Serialize};
 use tiny_keccak::{Hasher, Keccak};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-struct Note {
-    id: String,
+pub struct Note {
+    pub commitment: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-struct BlockDelta {
-    height: u64,
-    new_notes: Vec<Note>,
-    nullifiers: Vec<String>,
+pub struct BlockDelta {
+    pub height: u64,
+    pub new_notes: Vec<Note>,
+    pub nullifiers: Vec<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-struct WalletState {
-	anchor_height: u64,
-	notes: Vec<Note>,
-	proof: String,
+pub struct WalletState {
+    pub anchor_height: u64,
+    pub notes: Vec<Note>,
+    pub proof: String,
 }
 
 pub fn hash_bytes(input: &[u8]) -> String {
@@ -31,17 +31,24 @@ pub fn hash_bytes(input: &[u8]) -> String {
 }
 
 pub fn wallet_commitment(notes: &[Note]) -> String {
-    unimplemented!()
+    let mut commitments = notes
+        .iter()
+        .map(|note| note.commitment.as_str())
+        .collect::<Vec<_>>();
+    commitments.sort_unstable();
+    let commitments = commitments.join(";");
+
+    hash_bytes(commitments.as_bytes())
 }
 
 pub fn apply_block(prev: &WalletState, delta: &BlockDelta) -> Result<WalletState> {
-	unimplemented!()
+    unimplemented!()
 }
 
 pub fn verify_transaction(prev: &WalletState, next: &WalletState, delta: &BlockDelta) -> bool {
-	unimplemented!()
+    unimplemented!()
 }
 
 pub fn verify_chain(states: &[WalletState], deltas: &[BlockDelta]) -> bool {
-	unimplemented!()
+    unimplemented!()
 }
