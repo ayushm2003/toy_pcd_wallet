@@ -6,21 +6,21 @@ use serde_json::to_vec;
 use tiny_keccak::{Hasher, Keccak};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct Note {
+pub struct NoteCommitment {
     pub commitment: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct BlockDelta {
     pub height: u64,
-    pub new_notes: Vec<Note>,
+    pub new_notes: Vec<NoteCommitment>,
     pub nullifiers: Vec<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct WalletState {
     pub anchor_height: u64,
-    pub notes: Vec<Note>,
+    pub notes: Vec<NoteCommitment>,
     pub proof: String,
 }
 
@@ -33,7 +33,7 @@ pub fn hash_bytes(input: &[u8]) -> String {
     hex::encode(hash)
 }
 
-pub fn wallet_commitment(notes: &[Note]) -> String {
+pub fn wallet_commitment(notes: &[NoteCommitment]) -> String {
     let mut commitments = notes
         .iter()
         .map(|note| note.commitment.as_str())
@@ -45,7 +45,11 @@ pub fn wallet_commitment(notes: &[Note]) -> String {
 }
 
 // hashing as a standin for proofs
-pub fn compute_next_proof(prev_proof: &str, delta: &BlockDelta, next_notes: &[Note]) -> String {
+pub fn compute_next_proof(
+    prev_proof: &str,
+    delta: &BlockDelta,
+    next_notes: &[NoteCommitment],
+) -> String {
     let mut concat: Vec<u8> = Vec::new();
     concat.extend_from_slice(prev_proof.as_bytes());
     concat.extend_from_slice(&to_vec(&delta).unwrap());
@@ -64,7 +68,7 @@ pub fn apply_block(prev: &WalletState, delta: &BlockDelta) -> Result<WalletState
     }
 
     let spent: HashSet<&str> = delta.nullifiers.iter().map(|s| s.as_str()).collect();
-    let mut unspent_notes: Vec<Note> = prev
+    let mut unspent_notes: Vec<NoteCommitment> = prev
         .notes
         .iter()
         .filter(|note| !spent.contains(note.commitment.as_str()))

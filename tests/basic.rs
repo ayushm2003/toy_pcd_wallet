@@ -3,18 +3,18 @@ use toy_pcd_wallet::*;
 #[test]
 fn test_commitment_stable() {
     let c1 = wallet_commitment(&[
-        Note {
+        NoteCommitment {
             commitment: "b".into(),
         },
-        Note {
+        NoteCommitment {
             commitment: "a".into(),
         },
     ]);
     let c2 = wallet_commitment(&[
-        Note {
+        NoteCommitment {
             commitment: "a".into(),
         },
-        Note {
+        NoteCommitment {
             commitment: "b".into(),
         },
     ]);
@@ -30,10 +30,10 @@ fn test_next_proof_changes_with_notes() {
         new_notes: vec![],
         nullifiers: vec![],
     };
-    let n1 = vec![Note {
+    let n1 = vec![NoteCommitment {
         commitment: "x".into(),
     }];
-    let n2 = vec![Note {
+    let n2 = vec![NoteCommitment {
         commitment: "y".into(),
     }];
 
@@ -48,10 +48,10 @@ fn test_apply_block_spend_and_add() {
     let genesis = WalletState {
         anchor_height: 0,
         notes: vec![
-            Note {
+            NoteCommitment {
                 commitment: "note_a".into(),
             },
-            Note {
+            NoteCommitment {
                 commitment: "note_b".into(),
             },
         ],
@@ -59,7 +59,7 @@ fn test_apply_block_spend_and_add() {
     };
     let d2 = BlockDelta {
         height: 1,
-        new_notes: vec![Note {
+        new_notes: vec![NoteCommitment {
             commitment: "note_1".into(),
         }],
         nullifiers: vec!["note_a".into()],
@@ -78,14 +78,14 @@ fn test_apply_block_spend_and_add() {
 fn test_verify_chain_ok_and_tamper_fails() {
     let g = WalletState {
         anchor_height: 0,
-        notes: vec![Note {
+        notes: vec![NoteCommitment {
             commitment: "a".into(),
         }],
         proof: hash_bytes(b"genesis"),
     };
     let d1 = BlockDelta {
         height: 1,
-        new_notes: vec![Note {
+        new_notes: vec![NoteCommitment {
             commitment: "n1".into(),
         }],
         nullifiers: vec![],
@@ -98,24 +98,25 @@ fn test_verify_chain_ok_and_tamper_fails() {
 
     //add a fake note
     let mut s1_bad = s1.clone();
-    s1_bad.notes.push(Note {
+    s1_bad.notes.push(NoteCommitment {
         commitment: "evil".into(),
     });
 
     assert!(!verify_transition(&g, &s1_bad, &d1));
 }
 
+#[test]
 fn test_apply_block_height_mismatch_err() {
     let g = WalletState {
         anchor_height: 1,
-        notes: vec![Note {
+        notes: vec![NoteCommitment {
             commitment: "a".into(),
         }],
         proof: hash_bytes(b"genesis"),
     };
     let d = BlockDelta {
         height: 3, // should be 2
-        new_notes: vec![Note {
+        new_notes: vec![NoteCommitment {
             commitment: "b".into(),
         }],
         nullifiers: vec![],
@@ -134,18 +135,18 @@ fn test_next_proof_ignores_order_of_next_notes() {
     };
 
     let n1 = vec![
-        Note {
+        NoteCommitment {
             commitment: "x".into(),
         },
-        Note {
+        NoteCommitment {
             commitment: "y".into(),
         },
     ];
     let n2 = vec![
-        Note {
+        NoteCommitment {
             commitment: "y".into(),
         },
-        Note {
+        NoteCommitment {
             commitment: "x".into(),
         },
     ];
@@ -160,14 +161,14 @@ fn test_next_proof_ignores_order_of_next_notes() {
 fn test_nullifier_not_owned_is_ignored() {
     let g = WalletState {
         anchor_height: 0,
-        notes: vec![Note {
+        notes: vec![NoteCommitment {
             commitment: "a".into(),
         }],
         proof: hash_bytes(b"genesis"),
     };
     let d = BlockDelta {
         height: 1,
-        new_notes: vec![Note {
+        new_notes: vec![NoteCommitment {
             commitment: "b".into(),
         }],
         nullifiers: vec!["zzz".into()], // wallet doesn't own this
