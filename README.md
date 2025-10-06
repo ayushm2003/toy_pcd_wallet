@@ -12,7 +12,7 @@ so the tip proof attests to the entire history by induction.
 * Wallet state update:
 The wallet holds a set of note commitments. For a new block (a `BlockDelta`), it removes spent commitments, adds newly created ones and recomputes the PCD digest.
 
-## On run
+## Run
 
 ```bash
 cargo run
