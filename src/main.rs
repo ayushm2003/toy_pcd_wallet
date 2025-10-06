@@ -1,8 +1,7 @@
+use std::collections::HashMap;
 use toy_pcd_wallet::*;
 
 fn main() -> anyhow::Result<()> {
-    println!("Hello, world!");
-
     let mut state = WalletState {
         anchor_height: 0,
         notes: vec![
@@ -14,7 +13,13 @@ fn main() -> anyhow::Result<()> {
             },
         ],
         proof: hash_bytes(b"genesis"),
+        secrets: HashMap::new(),
     };
+
+    let owned = new_owned_note(&mut state);
+    state.notes.push(owned.clone());
+    let rho = state.secrets.get(&owned.commitment).expect("rho present");
+    let nf_owned = nf_from_rho(rho);
 
     let deltas = vec![
         BlockDelta {
@@ -29,7 +34,7 @@ fn main() -> anyhow::Result<()> {
             new_notes: vec![NoteCommitment {
                 commitment: "note_2".into(),
             }],
-            nullifiers: vec!["note_a".into()],
+            nullifiers: vec![nf_owned.clone()],
         },
         BlockDelta {
             height: 3,
@@ -44,16 +49,24 @@ fn main() -> anyhow::Result<()> {
 
     for d in &deltas {
         let next = apply_block(&state, d)?;
-        let state_transition = verify_transition(&state, &next, &d);
+        let proof_verified: bool = verify_transition(&state, &next, d);
         println!(
-            "h={}, proof={}, verified={}",
-            d.height, next.proof, state_transition
+            "h={}, notes={:?}, proof={}, proof_verified={}",
+            d.height,
+            ids(&next),
+            &next.proof[..8],
+            proof_verified
         );
         state = next;
         states.push(state.clone());
     }
 
     println!("verify_chain: {}", verify_chain(&states, &deltas));
-
     Ok(())
+}
+
+fn ids(s: &WalletState) -> Vec<&str> {
+    let mut v: Vec<&str> = s.notes.iter().map(|n| n.commitment.as_str()).collect();
+    v.sort_unstable();
+    v
 }

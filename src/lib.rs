@@ -1,6 +1,7 @@
-use std::collections::HashSet;
+use std::collections::HashMap;
 
 use anyhow::{Result, anyhow};
+use rand::{RngCore, rngs::OsRng};
 use serde::{Deserialize, Serialize};
 use serde_json::to_vec;
 use tiny_keccak::{Hasher, Keccak};
@@ -22,6 +23,7 @@ pub struct WalletState {
     pub anchor_height: u64,
     pub notes: Vec<NoteCommitment>,
     pub proof: String,
+    pub secrets: HashMap<String, [u8; 32]>,
 }
 
 pub fn hash_bytes(input: &[u8]) -> String {
@@ -31,6 +33,30 @@ pub fn hash_bytes(input: &[u8]) -> String {
     keccak.finalize(&mut hash);
 
     hex::encode(hash)
+}
+
+pub fn cm_from_rho(rho: &[u8; 32]) -> String {
+    let mut buf = Vec::with_capacity(2 + 32);
+    buf.extend_from_slice(b"cm");
+    buf.extend_from_slice(rho);
+    hash_bytes(&buf)
+}
+
+pub fn nf_from_rho(rho: &[u8; 32]) -> String {
+    let mut buf = Vec::with_capacity(2 + 32);
+    buf.extend_from_slice(b"nf");
+    buf.extend_from_slice(rho);
+    hash_bytes(&buf)
+}
+
+pub fn new_owned_note(state: &mut WalletState) -> NoteCommitment {
+    let mut rho = [0u8; 32];
+    OsRng.fill_bytes(&mut rho);
+
+    let cm = cm_from_rho(&rho);
+    state.secrets.insert(cm.clone(), rho);
+
+    NoteCommitment { commitment: cm }
 }
 
 pub fn wallet_commitment(notes: &[NoteCommitment]) -> String {
@@ -67,26 +93,34 @@ pub fn apply_block(prev: &WalletState, delta: &BlockDelta) -> Result<WalletState
         ));
     }
 
-    let spent: HashSet<&str> = delta.nullifiers.iter().map(|s| s.as_str()).collect();
-    let mut unspent_notes: Vec<NoteCommitment> = prev
-        .notes
-        .iter()
-        .filter(|note| !spent.contains(note.commitment.as_str()))
-        .cloned()
-        .collect();
-    unspent_notes.extend(delta.new_notes.clone());
+    let mut next_notes: Vec<NoteCommitment> = prev.notes.clone();
+    let mut next_secrets = prev.secrets.clone();
 
-    let next_proof = compute_next_proof(&prev.proof, delta, &unspent_notes);
+    for nf in &delta.nullifiers {
+        if let Some(cm_to_remove) = prev
+            .secrets
+            .iter()
+            .find_map(|(cm, rho)| (nf_from_rho(rho) == *nf).then(|| cm.clone()))
+        {
+            next_notes.retain(|n| n.commitment != cm_to_remove);
+            next_secrets.remove(&cm_to_remove);
+        }
+    }
+
+    next_notes.extend(delta.new_notes.clone());
+
+    let next_proof = compute_next_proof(&prev.proof, delta, &next_notes);
 
     Ok(WalletState {
         anchor_height: delta.height,
-        notes: unspent_notes,
+        notes: next_notes,
         proof: next_proof,
+        secrets: next_secrets,
     })
 }
 
 pub fn verify_transition(prev: &WalletState, next: &WalletState, delta: &BlockDelta) -> bool {
-    if delta.height != prev.anchor_height + 1 && delta.height != next.anchor_height {
+    if delta.height != prev.anchor_height + 1 || delta.height != next.anchor_height {
         return false;
     }
 
