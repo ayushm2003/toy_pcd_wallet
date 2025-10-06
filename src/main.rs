@@ -44,8 +44,8 @@ fn main() -> anyhow::Result<()> {
 
 	for d in &deltas {
 		let next = apply_block(&state, d)?;
-		let state_transition = verify_transition(&state, &next, &delta);
-		println!("h={} ok, proof={}, verified={}", d.height, next.proof);
+		let state_transition = verify_transition(&state, &next, &d);
+		println!("h={}, proof={}, verified={}", d.height, next.proof, state_transition);
 		state = next;
 		states.push(state.clone());
 	}
